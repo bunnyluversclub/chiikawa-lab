@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent, type Keybo
 import { GAME, type Character } from '@/lib/characters';
 import { useSound } from '@/lib/use-sound';
 import { sitePath } from '@/lib/site-path';
+import { trackCharacterEvent } from '@/lib/analytics';
 export default function Game({character, muted, onBack}: {character: Character; muted: boolean; onBack: () => void}) {
   const [progress, setProgress] = useState(0);
   const [holding, setHolding] = useState(false);
@@ -26,9 +27,9 @@ export default function Game({character, muted, onBack}: {character: Character; 
   const add = useCallback((amount: number) => {
     if (finished.current) return;
     value.current = Math.min(1, value.current + amount);
-    if (value.current >= 1) { finished.current = true; active.current = false; setHolding(false); setOffset(0); play('reaction'); }
+    if (value.current >= 1) { finished.current = true; active.current = false; setHolding(false); setOffset(0); play('reaction'); trackCharacterEvent('reaction_complete', character.id); }
     setProgress(value.current);
-  }, [play]);
+  }, [play, character.id]);
   useEffect(() => {
     if (!isC) return;
     let frame: number, previous = 0;
@@ -161,7 +162,7 @@ export default function Game({character, muted, onBack}: {character: Character; 
     }
     release();
   }
-  function reset() { release(); stop(); value.current = 0; finished.current = false; direction.current = 0; setProgress(0); setLanded(false); setTapPulse(0); strokeStartY.current = 0; extremeY.current = 0; rubDistance.current = 0; tapMovement.current = 0; setRound(r => r + 1); }
+  function reset() { release(); stop(); value.current = 0; finished.current = false; direction.current = 0; setProgress(0); setLanded(false); setTapPulse(0); strokeStartY.current = 0; extremeY.current = 0; rubDistance.current = 0; tapMovement.current = 0; setRound(r => r + 1); trackCharacterEvent('reset', character.id); }
   function keyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (finished.current) return;
     if (isC && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); if (!active.current) { prepareSound(); active.current = true; setHolding(true); play('basic'); } }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { CHARACTERS, type Character } from '@/lib/characters';
 import Game from '@/components/game';
 import { sitePath } from '@/lib/site-path';
+import { trackCharacterEvent, trackEvent } from '@/lib/analytics';
 
 export default function Home() {
   const [selected, setSelected] = useState<Character | null>(null);
@@ -16,11 +17,12 @@ export default function Home() {
   useEffect(() => { window.scrollTo(0, 0); }, [selected]);
 
   function toggleMute() {
-    setMuted(m => {
-      try { localStorage.setItem('touch-lab-muted', String(!m)); }
-      catch { /* In-memory mute still works. */ }
-      return !m;
-    });
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    try { localStorage.setItem('touch-lab-muted', String(nextMuted)); }
+    catch { /* In-memory mute still works. */ }
+    // Keep event delivery outside state updaters, which React may replay.
+    trackEvent('sound_toggle', { muted: nextMuted });
   }
 
   return (
@@ -58,7 +60,7 @@ export default function Home() {
             <div className="character-grid">
               {CHARACTERS.map(ch => (
                 <button key={ch.id} className={`character-card ${ch.color} ${!ch.available ? 'coming' : ''}`}
-                  disabled={!ch.available} onClick={() => setSelected(ch)}
+                  disabled={!ch.available} onClick={() => { setSelected(ch); trackCharacterEvent('character_select', ch.id); }}
                   aria-label={`${ch.name} ${ch.available ? '실험 시작' : '준비 중'}`}>
                   <div className="portrait">
                     <span className="portrait-doodle doodle-one" aria-hidden="true">{ch.id === 'c' || ch.id === 'h' ? '♡' : '✧'}</span>

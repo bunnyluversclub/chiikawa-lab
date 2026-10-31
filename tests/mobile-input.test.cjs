@@ -40,6 +40,7 @@ function harness(id) {
   }
   const window = bus(), document = bus();
   const played = [];
+  const analytics = [];
   let stops = 0;
   const sound = { play(kind) { played.push(kind); }, stop() { stops++; }, unlock() {} };
   function load(path, imports) {
@@ -55,7 +56,7 @@ function harness(id) {
     return exports;
   }
   const data = load('lib/characters.ts', {});
-  const Game = load('components/game.tsx', { react, '@/lib/site-path': load('lib/site-path.ts', {}), '@/lib/characters': data, '@/lib/use-sound': { useSound: () => sound } }).default;
+  const Game = load('components/game.tsx', { react, '@/lib/site-path': load('lib/site-path.ts', {}), '@/lib/characters': data, '@/lib/use-sound': { useSound: () => sound }, '@/lib/analytics': {trackCharacterEvent: (event, character) => analytics.push({event, character})} }).default;
   let tree;
   function render() {
     cursor = 0;
@@ -79,7 +80,7 @@ function harness(id) {
   }
   render();
   return {
-    window, elapse, render, played,
+    window, elapse, render, played, analytics,
     reset: () => { find(p => p.children === '↻ 다시 하기').props.onClick(); render(); },
     stops: () => stops,
     stage: () => find(p => p.className === 'visible' && typeof p.src === 'string')?.props.src,
@@ -341,5 +342,23 @@ test('Usagi normal 80px strokes finish in 3–5 seconds while retaining the exis
   }
   assert.equal(h.progress(),100); assert.equal(h.played.filter(s=>s==='reaction').length,1);
   h.dispose();
+});
+
+test('each character sends completion once per play and reset once per user action', () => {
+  for(const id of ['c','u','h','m']) {
+    const h=harness(id);
+    function complete() {
+      if(id==='c') {h.surface().onPointerDown(touch());h.elapse(3700);}
+      else for(let i=0;i<50;i++) h.surface().onKeyDown({key:id==='u'?(i%2?'ArrowDown':'ArrowUp'):id==='h'?(i%2?'ArrowRight':'ArrowLeft'):'Enter',repeat:false,preventDefault(){}});
+      h.render();
+    }
+    assert.equal(h.analytics.length,0); complete(); assert.equal(h.progress(),100);
+    assert.deepEqual(h.analytics,[{event:'reaction_complete',character:id}]);
+    h.surface().onPointerDown(touch());h.elapse(500);h.surface().onPointerUp({pointerId:1,type:'pointerup'});
+    assert.equal(h.analytics.length,1);
+    h.reset();assert.deepEqual(h.analytics[1],{event:'reset',character:id});
+    complete();assert.equal(h.analytics.filter(e=>e.event==='reaction_complete').length,2);
+    assert.equal(h.analytics.filter(e=>e.event==='reset').length,1);h.dispose();
+  }
 });
 
