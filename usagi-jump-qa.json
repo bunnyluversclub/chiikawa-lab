@@ -1,0 +1,29 @@
+[
+  {
+    "width": 390,
+    "height": 844,
+    "actionsVisible": true,
+    "imageFits": true,
+    "noOverflow": true,
+    "progress": "100",
+    "stage": "/images/u_3.png"
+  },
+  {
+    "width": 393,
+    "height": 852,
+    "actionsVisible": true,
+    "imageFits": true,
+    "noOverflow": true,
+    "progress": "100",
+    "stage": "/images/u_3.png"
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "actionsVisible": true,
+    "imageFits": true,
+    "noOverflow": true,
+    "progress": "100",
+    "stage": "/images/u_3.png"
+  }
+]
