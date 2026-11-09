@@ -3,7 +3,7 @@ import type { CharacterId } from './characters';
 export const GA_MEASUREMENT_ID = 'G-TR2E2GHRDQ';
 export const analyticsEnabled = process.env.NODE_ENV === 'production';
 
-const characterNames = { c: 'chiikawa', u: 'usagi', h: 'hachiware', m: 'momonga' } as const;
+const characterNames = { c: 'chiikawa', u: 'usagi', h: 'hachiware', m: 'momonga', k: 'kurimanju', r: 'rakko', s: 'shisa', kani: 'kani' } as const;
 type CharacterName = typeof characterNames[CharacterId];
 type CharacterEvent = 'character_select' | 'reaction_complete' | 'reset';
 type EventParameters = {

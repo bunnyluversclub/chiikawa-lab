@@ -1,0 +1,101 @@
+[
+  {
+    "size": "390x844",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/r_3.png",
+    "loaded": true,
+    "name": "랏코",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "390x844",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/s_3.png",
+    "loaded": true,
+    "name": "시사",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "390x844",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/cc_3.png",
+    "loaded": true,
+    "name": "?",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "393x852",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/r_3.png",
+    "loaded": true,
+    "name": "랏코",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "393x852",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/s_3.png",
+    "loaded": true,
+    "name": "시사",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "393x852",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/cc_3.png",
+    "loaded": true,
+    "name": "?",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "430x932",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/r_3.png",
+    "loaded": true,
+    "name": "랏코",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "430x932",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/s_3.png",
+    "loaded": true,
+    "name": "시사",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  },
+  {
+    "size": "430x932",
+    "buttonsFit": true,
+    "frameFits": true,
+    "image": "/images/cc_3.png",
+    "loaded": true,
+    "name": "?",
+    "noOverflow": true,
+    "progress": "100",
+    "secretNameAbsent": true
+  }
+]

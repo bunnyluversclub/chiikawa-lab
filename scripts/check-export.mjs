@@ -28,7 +28,9 @@ async function checkPublic(dir = '') {
   }
 }
 await checkPublic();
-assert.match(html, /다음 연구 대상은/);
 assert.match(html, /쿠리만쥬/);
 assert.match(html, /랏코/);
+assert.match(html, /시사/);
+assert.match(html, /cc_1\.png/);
+assert.doesNotMatch(html, /upcoming-friends|카니/);
 console.log(`Static export passed: ${checked} HTML references/public files, prefix "${prefix || '/'}".`);

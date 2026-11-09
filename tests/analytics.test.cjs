@@ -29,9 +29,9 @@ test('GA initialization queues one config/page_view, including when an early eve
   assert.equal(entries.filter(args => args[0] === 'event' && args[1] === 'page_view').length, 0);
 });
 
-test('GA maps all four characters and keeps sound_toggle muted as a boolean', () => {
+test('GA maps all eight character IDs and keeps sound_toggle muted as a boolean', () => {
   const window = {}, ga = load('lib/analytics.ts', { window });
-  for (const [id, name] of [['c','chiikawa'],['u','usagi'],['h','hachiware'],['m','momonga']]) {
+  for (const [id, name] of [['c','chiikawa'],['u','usagi'],['h','hachiware'],['m','momonga'],['k','kurimanju'],['r','rakko'],['s','shisa'],['kani','kani']]) {
     for (const event of ['character_select','reaction_complete','reset']) {
       ga.trackCharacterEvent(event, id);
       const last = window.dataLayer.at(-1);
@@ -68,12 +68,14 @@ test('real home handlers send one select/toggle event; loading saved mute sends 
     },
     useEffect(fn) { effects.push(fn); },
   };
-  const { CHARACTERS } = load('lib/characters.ts');
+  const { CHARACTERS, isNewCharacter } = load('lib/characters.ts');
   const { default: Home } = load('app/page.tsx', { window: { scrollTo() {} }, localStorage: {
     getItem: key => storage[key], setItem: (key, value) => { storage[key] = value; },
   } }, {
-    react, '@/lib/characters': { CHARACTERS }, '@/components/game': () => null,
+    react, '@/lib/characters': { CHARACTERS, isNewCharacter }, '@/components/game': () => null, '@/components/new-character-game': () => null,
+    '@/lib/character-image': { characterImage: (c,s) => `/images/${c.imagePrefix || c.id}_${s}.png` },
     '@/lib/site-path': { sitePath: path => path },
+    '@/lib/prepare-stage-audio': { prepareStageAudio() {} },
     '@/lib/analytics': {
       trackCharacterEvent: (event, character) => events.push({event, character}),
       trackEvent: (event, parameters) => events.push({event, ...parameters}),
@@ -94,4 +96,23 @@ test('real home handlers send one select/toggle event; loading saved mute sends 
   find(p => p['aria-label'] === '우사기 실험 시작').onClick(); render();
   assert.deepEqual(events[2],{event:'character_select',character:'u'});
   assert.equal(events.length,3);
+  for(const id of ['k','r','s','kani']) {
+    slots[0]=null;render();const character=CHARACTERS.find(c=>c.id===id);
+    find(p=>p['aria-label']===`${character.name} 실험 시작`).onClick();render();
+    assert.equal(find(p=>p.character?.id===id).character.name,character.name);
+    assert.deepEqual(events.at(-1),{event:'character_select',character:id});
+  }
+  const discoveryKey='touch-lab-kani-discovered';
+  assert.equal(storage[discoveryKey],undefined);
+  find(p=>p.character?.id==='kani').onDiscover();render();
+  assert.equal(storage[discoveryKey],'true');
+  assert.equal(find(p=>p.character?.id==='kani').character.name,'?');
+  find(p=>p.character?.id==='kani').onBack();render();
+  find(p=>p['aria-label']==='? 실험 시작').onClick();render();
+  assert.equal(find(p=>p.character?.id==='kani').character.name,'?');
+  assert.deepEqual(events.at(-1),{event:'character_select',character:'kani'});
+  // Remount with a fresh React state store, as after a full page reload.
+  slots.length=0;effects.length=0;render();effects.splice(0).forEach(fn=>fn());render();
+  assert.ok(find(p=>p['aria-label']==='? 실험 시작'));
+  assert.equal(find(p=>p['aria-label']==='카니 실험 시작'),undefined);
 });

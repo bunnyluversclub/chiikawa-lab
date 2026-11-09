@@ -224,16 +224,17 @@ test('Hachiware and Momonga keyboard access does not use Chiikawa hold or Usagi 
   m.dispose();
 });
 
-test('all four playable characters reference actual images and sound files', () => {
+test('all eight playable characters reference real images and exact sound files', () => {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/characters.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports });
-  assert.equal(exports.CHARACTERS.length, 4);
+  assert.equal(exports.CHARACTERS.length, 8);
   for (const c of exports.CHARACTERS) {
     assert.equal(c.available, true);
-    for (const stage of [1,2,3]) assert.ok(fs.existsSync(`public/images/${c.id}_${stage}.png`));
+    for (const stage of [1,2,3]) assert.ok(fs.existsSync(`public/images/${c.imagePrefix || c.id}_${stage}.png`));
     assert.ok(fs.existsSync(`public${c.sound}`), c.sound);
     assert.ok(fs.existsSync(`public${c.reaction}`), c.reaction);
   }
+  const secret=exports.CHARACTERS.find(c=>c.id==='kani');assert.equal(secret.name,'?');assert.equal(secret.imagePrefix,'cc');
 });
 
 

@@ -4,20 +4,30 @@ import { GAME, type Character } from './characters';
 import { sitePath } from './site-path';
 
 type SoundKind = 'basic' | 'reaction';
-export function useSound(character: Character, muted: boolean) {
+export type SoundBank = Partial<Record<SoundKind, HTMLAudioElement>>;
+export function useSound(character: Character, muted: boolean, preparedSounds?: () => SoundBank) {
   const audio = useRef<Partial<Record<SoundKind, HTMLAudioElement>> | null>(null);
   const last = useRef(-Infinity);
   const muteRef = useRef(muted);
   muteRef.current = muted;
 
   useEffect(() => {
-    const sounds: Partial<Record<SoundKind, HTMLAudioElement>> = {};
-    if (character.sound) sounds.basic = new Audio(sitePath(character.sound));
-    if (character.reaction) sounds.reaction = new Audio(sitePath(character.reaction));
-    Object.values(sounds).forEach(a => { a.preload = 'auto'; a.load(); });
+    const sounds: SoundBank = preparedSounds ? preparedSounds() : {};
+    if (!preparedSounds) {
+      if (character.sound) sounds.basic = new Audio(sitePath(character.sound));
+      if (character.reaction) sounds.reaction = new Audio(sitePath(character.reaction));
+      Object.values(sounds).forEach(a => { a.preload = 'auto'; a.load(); });
+    }
     audio.current = sounds;
-    return () => { Object.values(sounds).forEach(a => a.pause()); audio.current = null; };
-  }, [character]);
+    return () => {
+      if (preparedSounds) {
+        audio.current = null;
+        // A Strict Mode setup replay reuses the warmed elements immediately.
+        // Do not abort their pending Safari priming during that replay.
+        queueMicrotask(() => { if (audio.current !== sounds) Object.values(sounds).forEach(a => a.pause()); });
+      } else { Object.values(sounds).forEach(a => a.pause()); audio.current = null; }
+    };
+  }, [character, preparedSounds]);
 
   useEffect(() => {
     if (audio.current) Object.values(audio.current).forEach(a => { a.muted = muted; });

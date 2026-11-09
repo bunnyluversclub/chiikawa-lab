@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CHARACTERS, type Character } from '@/lib/characters';
+import { CHARACTERS, isNewCharacter, type Character } from '@/lib/characters';
 import Game from '@/components/game';
+import NewCharacterGame from '@/components/new-character-game';
+import { characterImage } from '@/lib/character-image';
 import { sitePath } from '@/lib/site-path';
 import { trackCharacterEvent, trackEvent } from '@/lib/analytics';
+import { prepareStageAudio } from '@/lib/prepare-stage-audio';
+
+const KANI_DISCOVERY_KEY = 'touch-lab-kani-discovered';
 
 export default function Home() {
   const [selected, setSelected] = useState<Character | null>(null);
@@ -15,6 +20,11 @@ export default function Home() {
     catch { /* Storage may be blocked in private browsing. */ }
   }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [selected]);
+
+  function discoverKani() {
+    try { localStorage.setItem(KANI_DISCOVERY_KEY, 'true'); }
+    catch { /* Discovery storage is optional; the name is controlled by stage. */ }
+  }
 
   function toggleMute() {
     const nextMuted = !muted;
@@ -38,7 +48,9 @@ export default function Home() {
       </header>
 
       {selected ? (
-        <Game key={selected.id} character={selected} muted={muted} onBack={() => setSelected(null)} />
+        isNewCharacter(selected)
+          ? <NewCharacterGame key={selected.id} character={selected} muted={muted} onBack={() => setSelected(null)} onDiscover={discoverKani} />
+          : <Game key={selected.id} character={selected} muted={muted} onBack={() => setSelected(null)} />
       ) : (
         <main className="home">
           <section className="hero" aria-label="치이카와 만지작 연구소">
@@ -60,12 +72,12 @@ export default function Home() {
             <div className="character-grid">
               {CHARACTERS.map(ch => (
                 <button key={ch.id} className={`character-card ${ch.color} ${!ch.available ? 'coming' : ''}`}
-                  disabled={!ch.available} onClick={() => { setSelected(ch); trackCharacterEvent('character_select', ch.id); }}
+                  disabled={!ch.available} onClick={() => { if (isNewCharacter(ch)) prepareStageAudio(ch, muted); setSelected(ch); trackCharacterEvent('character_select', ch.id); }}
                   aria-label={`${ch.name} ${ch.available ? '실험 시작' : '준비 중'}`}>
                   <div className="portrait">
                     <span className="portrait-doodle doodle-one" aria-hidden="true">{ch.id === 'c' || ch.id === 'h' ? '♡' : '✧'}</span>
                     <div className="portrait-sprite" style={{ transform: `scale(${ch.displayScale})` }}>
-                      <img src={sitePath(`/images/${ch.id}_1.png`)} alt={ch.name} draggable={false} />
+                      <img src={characterImage(ch, 1)} alt={ch.name} draggable={false} />
                     </div>
                     <span className="portrait-doodle doodle-two" aria-hidden="true">{ch.id === 'u' ? '〰' : '✧'}</span>
                     <div className="ground" />
@@ -75,25 +87,11 @@ export default function Home() {
                     {ch.available && <p>{ch.description}</p>}
                     <span className="card-cta">
                       {ch.available
-                        ? `${ch.id === 'u' ? '↕ ' : ch.id === 'h' ? '↔ ' : ''}${ch.interaction}${ch.id === 'c' || ch.id === 'm' ? ' →' : ''}`
+                        ? `${ch.id === 'u' ? '↕ ' : ch.id === 'h' ? '↔ ' : ch.id === 'k' ? '↶ ' : ''}${ch.interaction}${ch.id === 'c' || ch.id === 'm' || ch.id === 'r' || ch.id === 's' || ch.id === 'kani' ? ' →' : ''}`
                         : '준비 중'}
                     </span>
                   </div>
                 </button>
-              ))}
-            </div>
-          </section>
-          <section className="upcoming-friends" aria-labelledby="upcoming-heading">
-            <h2 id="upcoming-heading">다음 연구 대상은...?</h2>
-            <div className="upcoming-lineup">
-              {[{id: 'k', name: '쿠리만쥬'}, {id: 'r', name: '랏코'}].map(friend => (
-                <figure className="upcoming-friend" key={friend.id}>
-                  <img src={sitePath(`/images/${friend.id}_1.png`)} alt={friend.name} width={140} height={140} loading="lazy" draggable={false} />
-                  <figcaption>
-                    <span className="upcoming-name">{friend.name}</span>
-                    <span className="upcoming-status">준비 중</span>
-                  </figcaption>
-                </figure>
               ))}
             </div>
           </section>
