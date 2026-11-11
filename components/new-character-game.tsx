@@ -65,7 +65,7 @@ export default function NewCharacterGame({character, muted = false, onBack, onDi
     if (isTilt && !finished.current) { heldMs.current = 0; ready.current = false; setStage(1); setProgress(0); }
   }
   useEffect(() => {
-    if (isStudy) later(() => { setStage(2); sound.enterMiddle(); showDistraction(0); }, NEW_PLAY.studyStartMs);
+    if (isStudy) later(() => showDistraction(0), NEW_PLAY.studyStartMs);
     return () => {
       clearTimers(); dropCapture(session.current); session.current = null;
       keyboardTilt.current = false; eligible.current = false;
@@ -93,6 +93,9 @@ export default function NewCharacterGame({character, muted = false, onBack, onDi
     if (eligible.current) { setStage(2); sound.enterMiddle(); }
     else { heldMs.current = 0; setStage(1); setProgress(0); }
   }
+  function startStudy() {
+    if (isStudy && !finished.current) { setStage(2); sound.enterMiddle(); }
+  }
   function down(e: PointerEvent<HTMLButtonElement>, itemIndex = 0) {
     if (finished.current || consumed.current || throwing.current || session.current || keyboardTilt.current || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (isStudy && visibleDistraction.current !== itemIndex) return;
@@ -103,6 +106,7 @@ export default function NewCharacterGame({character, muted = false, onBack, onDi
     session.current = {id: e.pointerId, target: e.currentTarget, captured: false, x: e.clientX, y: e.clientY, centerX: item.left + item.width / 2, centerY: item.top + item.height / 2, itemIndex, lastX: e.clientX, lastY: e.clientY, lastTime: eventTime(e), vx: 0, vy: 0};
     setActiveItem(itemIndex); setDragging(true);
     sound.unlock();
+    startStudy();
     try { e.currentTarget.setPointerCapture(e.pointerId); session.current.captured = true; } catch { /* Window events keep the session alive. */ }
   }
   function move(e: PointEvent) {
@@ -244,7 +248,7 @@ export default function NewCharacterGame({character, muted = false, onBack, onDi
           : <button type="button" className={`drag-item ${dragging ? 'dragging' : ''}`} style={{transform: `translate(${offset.x}px, ${offset.y}px)`}} aria-label="디저트 먹여주기. 키보드는 엔터." {...pointerHandlers}><span aria-hidden="true">🍰</span></button>)}
         {isStudy && distraction !== null && <button type="button" key={distraction} className={`distraction distraction-${distraction} ${dragging ? 'dragging' : ''} ${flying ? 'flying' : ''}`} style={{transform: `translate(${offset.x}px, ${offset.y}px)`}} aria-label={`방해 요소 ${['💤','📱','💭'][distraction]} 잡고 던지기. 키보드는 방향키.`} {...pointerHandlers} onPointerDown={e => down(e, distraction)} onKeyDown={e => {
           const direction = {ArrowLeft: [-120,0], ArrowRight: [120,0], ArrowUp: [0,-120], ArrowDown: [0,120]}[e.key];
-          if (direction && !session.current) { e.preventDefault(); if (!e.repeat) { sound.unlock(); tossDistraction(distraction, direction[0], direction[1]); } }
+          if (direction && !session.current) { e.preventDefault(); if (!e.repeat) { sound.unlock(); startStudy(); tossDistraction(distraction, direction[0], direction[1]); } }
         }}><span aria-hidden="true">{['💤','📱','💭'][distraction]}</span></button>}
         <div className="stage-ground" />
       </div>

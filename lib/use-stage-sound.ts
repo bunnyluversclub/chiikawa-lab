@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef } from 'react';
 import { CHARACTERS, type NewCharacterId } from './characters';
-import { takeStageAudio, type StageAudio } from './prepare-stage-audio';
+import { takeStageAudio, primeStageAudio, type StageAudio } from './prepare-stage-audio';
 import { useSound } from './use-sound';
 
 export function useStageSound(id: NewCharacterId, muted: boolean) {
@@ -9,9 +9,8 @@ export function useStageSound(id: NewCharacterId, muted: boolean) {
   const definition = CHARACTERS.find(character => character.id === id)!;
   const bank = useRef<StageAudio | null>(null);
   const supply = useCallback(() => { bank.current ??= takeStageAudio(definition); return bank.current.sounds; }, [definition]);
-  const {play, stop, unlock} = useSound(definition, muted, supply);
+  const {play, stop} = useSound(definition, muted, supply);
   const middle = useRef(false), final = useRef(false), generation = useRef(0);
-  const unlocked = useRef(false);
   const mute = useRef(muted); mute.current = muted;
 
   function request(kind: 'basic' | 'reaction') {
@@ -25,8 +24,7 @@ export function useStageSound(id: NewCharacterId, muted: boolean) {
   function complete() { if (!final.current) { final.current = true; request('reaction'); } }
   function reset() { generation.current++; middle.current = false; final.current = false; stop(); }
   function unlockInput() {
-    if (mute.current || bank.current?.primed || unlocked.current) return;
-    unlocked.current = true; unlock();
+    if (!mute.current && bank.current) primeStageAudio(bank.current);
   }
   useEffect(() => () => {
     generation.current++;

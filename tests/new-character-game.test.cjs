@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 // Exercise the actual component with a deterministic clock and Pointer Events.
-function harness(id, muted = false, preparedMode = false, deferWarm = false) {
+function harness(id, muted = false, preparedMode = false, deferWarm = false, iosVolume = false) {
   let now = 0, cursor = 0, nextId = 0, tree, backCount = 0, discoveries = 0;
   const slots = [], effects = [], frames = new Map(), timers = new Map(), events = [];
   const same = (a,b) => a && b && a.length === b.length && a.every((v,i) => Object.is(v,b[i]));
@@ -19,9 +19,14 @@ function harness(id, muted = false, preparedMode = false, deferWarm = false) {
   const window=bus(),document=bus();
   const audible=[],clips=[],warmResolvers=[];
   class Audio {
-    constructor(src){this.src=src;this.paused=true;this.ended=false;this.muted=false;this.volume=1;this.currentTime=0;clips.push(this);}
+    constructor(src){this.src=src;this.paused=true;this.ended=false;this._muted=false;this._volume=1;this.currentTime=0;this.heard=false;clips.push(this);}
+    get volume(){return iosVolume?1:this._volume;}
+    set volume(value){if(!iosVolume)this._volume=value;}
+    get muted(){return this._muted;}
+    set muted(value){this._muted=value;this.observe();}
+    observe(){if(!this.paused&&!this.muted&&this.volume>0&&!this.src.startsWith('data:')&&!this.heard){audible.push(this.src);this.heard=true;}}
     load(){}
-    play(){this.plays=(this.plays||0)+1;this.paused=false;if(!this.muted&&this.volume>0)audible.push(this.src);return deferWarm&&this.volume===0?new Promise(resolve=>warmResolvers.push(resolve)):Promise.resolve();}
+    play(){this.plays=(this.plays||0)+1;this.playedSources??=[];this.playedSources.push(this.src);this.paused=false;this.heard=false;this.observe();return deferWarm&&(this.volume===0||this.src.startsWith('data:'))?new Promise(resolve=>warmResolvers.push(resolve)):Promise.resolve();}
     pause(){this.paused=true;}
   }
   function load(path,imports={}) {
@@ -179,7 +184,7 @@ test('Shisa uses recent flick speed after a hold; old velocity or fast sub-thres
 });
 
 test('Shisa completes only after all three flights; reset, secondary touches and pointer cancellation are safe',()=>{
-  const h=harness('s');assert.match(h.stage(),/s_1/);h.advance(750);assert.match(h.stage(),/s_2/);
+  const h=harness('s');assert.match(h.stage(),/s_1/);h.advance(750);assert.match(h.stage(),/s_1/);
   h.control().onPointerDown(pointer(1,true));move(h,340,200,2,true);end(h,340,200,2,true);assert.equal(h.progress(),0);
   move(h,340,200,1,true);end(h,340,200,1,true,'pointercancel');assert.equal(h.progress(),0);
   const positions=[];
@@ -200,63 +205,111 @@ test('Shisa flight and queued next distraction are cancelled on reset and unmoun
   h.control().onPointerDown(pointer());move(h,340,200);end(h,340,200);h.dispose();assert.equal(h.pending(),0);h.advance(2000);assert.equal(h.events.filter(e=>e.event==='reaction_complete').length,0);
 });
 
-function completeSoundRound(h,id) {
+async function completeSoundRound(h,id) {
   if(id==='k') {
-    h.control().onKeyDown({key:'ArrowRight',preventDefault(){}});h.advance(720);
+    h.control().onKeyDown({key:'ArrowRight',preventDefault(){}});await flushAudio();h.advance(720);
     for(let i=0;i<5;i++)h.control().onKeyDown({key:'ArrowRight',repeat:true,preventDefault(){}});
     h.control().onKeyUp({key:'ArrowRight'});h.render();
   } else if(id==='r') {
-    h.control().onKeyDown({key:'Enter',repeat:false,preventDefault(){}});h.render();h.advance(1200);
+    h.control().onKeyDown({key:'Enter',repeat:false,preventDefault(){}});h.render();await flushAudio();h.advance(1200);
     assert.match(h.stage(),/r_2/);h.control().onKeyDown({key:'Enter',repeat:false,preventDefault(){}});h.render();
   } else if(id==='s') {
-    h.advance(750);for(let i=0;i<3;i++){h.control().onKeyDown({key:'ArrowUp',repeat:false,preventDefault(){}});h.render();h.advance(300);if(i<2)h.advance(650);}
+    h.advance(750);for(let i=0;i<3;i++){h.control().onKeyDown({key:'ArrowUp',repeat:false,preventDefault(){}});h.render();await flushAudio();h.advance(300);if(i<2)h.advance(650);}
   } else {
     h.control(0).onKeyDown({key:'Enter',repeat:false,preventDefault(){}});h.render();assert.equal(h.audible.length%2,0);
-    h.control(3).onKeyDown({key:'Enter',repeat:false,preventDefault(){}});h.render();h.advance(1200);
+    h.control(3).onKeyDown({key:'Enter',repeat:false,preventDefault(){}});h.render();await flushAudio();h.advance(1200);
   }
+  await flushAudio();
   assert.equal(h.progress(),100);
 }
 
-test('actual shared audio hook plays each new middle/final clip once per round and reset restores them',()=>{
+test('actual shared audio hook plays each new middle/final clip once per round and reset restores them',async()=>{
   for(const [id,prefix]of [['k','k'],['r','r'],['s','s'],['kani','cc']]){
-    const h=harness(id);completeSoundRound(h,id);
+    const h=harness(id);await completeSoundRound(h,id);
     const pair=[`/sounds/${prefix}_1.MP3`,`/sounds/${prefix}_2.MP3`];assert.deepEqual(h.audible,pair);
     assert.equal(h.clips[0].paused,true); // Finale stops the middle clip instead of overlapping it.
     if(id==='kani'){h.rename('카니');assert.equal(h.clips.length,2);assert.equal(h.clips[1].paused,false);}
     h.advance(3000);assert.deepEqual(h.audible,pair);
-    h.reset();completeSoundRound(h,id);assert.deepEqual(h.audible,[...pair,...pair]);h.dispose();assert.ok(h.clips.every(a=>a.paused));
+    h.reset();await completeSoundRound(h,id);assert.deepEqual(h.audible,[...pair,...pair]);h.dispose();assert.ok(h.clips.every(a=>a.paused));
   }
 });
 
-test('all new clips obey global mute, do not replay skipped stages on unmute, and replay after reset',()=>{
+test('all new clips obey global mute, do not replay skipped stages on unmute, and replay after reset',async()=>{
   for(const id of ['k','r','s','kani']){
-    const h=harness(id,true);completeSoundRound(h,id);assert.equal(h.audible.length,0);
+    const h=harness(id,true);await completeSoundRound(h,id);assert.equal(h.audible.length,0);
     h.setMuted(false);h.advance(1000);assert.equal(h.audible.length,0);
-    h.reset();completeSoundRound(h,id);assert.equal(h.audible.length,2);
+    h.reset();await completeSoundRound(h,id);assert.equal(h.audible.length,2);
     h.setMuted(true);assert.ok(h.clips.every(a=>a.muted));h.dispose();
   }
 });
 
 async function flushAudio(){for(let i=0;i<12;i++)await Promise.resolve();}
 
-test('card priming remains silent through hook mount, and automatic study audio uses the same warmed elements',async()=>{
-  const h=harness('s',false,true);assert.equal(h.clips.length,2);assert.ok(h.clips.every(a=>a.volume===0));assert.equal(h.audible.length,0);
-  await flushAudio();assert.ok(h.clips.every(a=>a.volume===1&&a.paused));
-  completeSoundRound(h,'s');assert.deepEqual(h.audible,['/sounds/s_1.MP3','/sounds/s_2.MP3']);
-  assert.equal(h.clips[0].plays,2);assert.equal(h.clips[1].plays,2);h.dispose();
+test('card preparation plays only silent PCM, never a stage MP3, including Strict Mode effect replay',async()=>{
+  for(const id of ['k','r','s','kani']){
+    const h=harness(id,false,true,true,true);h.replayEffects();await flushAudio();
+    assert.equal(h.clips.length,2);assert.ok(h.clips.every(a=>a.playedSources.every(src=>src.startsWith('data:audio/wav'))));
+    assert.deepEqual(h.audible,[]);h.resolveWarm();await flushAudio();
+    assert.ok(h.clips.every(a=>a.paused));await completeSoundRound(h,id);
+    assert.equal(h.audible.length,2);h.dispose();await flushAudio();assert.ok(h.clips.every(a=>a.paused));
+  }
 });
 
-test('pending warm-up cannot replay a stale stage after reset, unmute or component cleanup',async()=>{
-  const h=harness('s',false,true,true);h.advance(750);assert.equal(h.audible.length,0);
-  h.reset();h.setMuted(true);h.resolveWarm();await flushAudio();assert.equal(h.audible.length,0);
-  h.advance(750);h.setMuted(false);assert.equal(h.audible.length,0);
-  h.reset();h.advance(750);assert.deepEqual(h.audible,['/sounds/s_1.MP3']);h.dispose();
-  const leaving=harness('s',false,true,true);leaving.advance(750);leaving.dispose();leaving.resolveWarm();await flushAudio();assert.equal(leaving.audible.length,0);assert.ok(leaving.clips.every(a=>a.paused));
+test('pending warm-up cannot replay a stale stage after reset, mute or component cleanup',async()=>{
+  for(const id of ['k','r','s','kani']){
+    const h=harness(id,false,true,true,true);
+    if(id==='s'){h.advance(750);h.control().onPointerDown(pointer());}
+    else if(id==='k')h.control().onKeyDown({key:'ArrowRight',preventDefault(){}});
+    else h.control().onKeyDown({key:'Enter',repeat:false,preventDefault(){}});
+    h.render();assert.deepEqual(h.audible,[]);h.reset();h.resolveWarm();await flushAudio();
+    assert.deepEqual(h.audible,[]);h.advance(2000);assert.deepEqual(h.audible,[]);
+    await completeSoundRound(h,id);assert.equal(h.audible.length,2);h.dispose();
+    const leaving=harness(id,false,true,true,true);leaving.dispose();leaving.resolveWarm();await flushAudio();
+    assert.deepEqual(leaving.audible,[]);assert.ok(leaving.clips.every(a=>a.paused));
+  }
 });
 
-test('Strict Mode effect replay preserves pending Safari priming and the same audio pair',async()=>{
-  const h=harness('s',false,true,true);h.replayEffects();await flushAudio();assert.equal(h.clips.length,2);
-  assert.ok(h.clips.every(a=>!a.paused&&a.volume===0));h.resolveWarm();await flushAudio();
-  completeSoundRound(h,'s');assert.deepEqual(h.audible,['/sounds/s_1.MP3','/sounds/s_2.MP3']);assert.equal(h.clips.length,2);
-  h.dispose();await flushAudio();assert.ok(h.clips.every(a=>a.paused));
+// Safari ignores volume writes; record an in-flight clip becoming audible when
+// React's mute effect runs, rather than checking mute only at play() invocation.
+test('iOS volume semantics: entering every new character is silent before and after pending priming',async()=>{
+  for(const id of ['k','r','s','kani']){
+    const h=harness(id,false,true,true,true);
+    assert.deepEqual(h.audible,[],id+' must be silent during mount');
+    h.advance(5000);assert.deepEqual(h.audible,[],id+' must stay silent without input');
+    h.resolveWarm();await flushAudio();assert.deepEqual(h.audible,[],id+' must be silent after priming');
+    h.reset();h.advance(5000);assert.deepEqual(h.audible,[],id+' reset must stay silent');h.dispose();
+  }
+});
+
+test('mouse/touch stage audio: silence on entry/reset, one middle, one final, mute and replay for every new character',async()=>{
+  for(const type of ['mouse','touch'])for(const muted of [false,true])for(const [id,prefix]of [['k','k'],['r','r'],['s','s'],['kani','cc']]){
+    const h=harness(id,muted,true,false,true);await flushAudio();
+    const pair=[`/sounds/${prefix}_1.MP3`,`/sounds/${prefix}_2.MP3`];
+    function feed(pointerId=1){h.control().onPointerDown(pointer(pointerId,false,type,240,374));move(h,240,203,pointerId);end(h,240,203,pointerId);}
+    function throwItem(pointerId){h.control().onPointerDown(pointer(pointerId,false,type));move(h,340,200,pointerId);end(h,340,200,pointerId);h.advance(300);}
+    for(let round=0;round<2;round++){
+      h.advance(5000);assert.match(h.stage(),new RegExp((id==='kani'?'cc':id)+'_1'));assert.deepEqual(h.audible,muted?[]:pair.slice(0,0).concat(...Array(round).fill(pair)));
+      if(id==='k'){h.control().onPointerDown(pointer(1,false,type));move(h,320,200);}
+      else if(id==='r')feed();
+      else if(id==='s'){h.control().onPointerDown(pointer(1,false,type));end(h,240,200);}
+      else {h.control(3).onPointerDown(pointer(1,false,type,240,374));move(h,240,127);end(h,240,127);}
+      h.render();await flushAudio();assert.match(h.stage(),/_2\.png$/);
+      const previous=Array(round).fill(pair).flat();assert.deepEqual(h.audible,muted?[]:[...previous,pair[0]]);
+      if(id==='k'){h.advance(720);end(h,320,200);}
+      else if(id==='r'){h.advance(700);feed(2);}
+      else if(id==='s'){for(let i=0;i<3;i++){throwItem(i+2);if(i<2)h.advance(650);}}
+      else h.advance(1200);
+      await flushAudio();assert.match(h.stage(),/_3\.png$/);assert.deepEqual(h.audible,muted?[]:[...previous,...pair]);
+      h.advance(2000);assert.deepEqual(h.audible,muted?[]:[...previous,...pair]);
+      h.reset();await flushAudio();assert.deepEqual(h.audible,muted?[]:[...previous,...pair]);
+    }
+    h.dispose();
+  }
+});
+
+test('Safari priming WAV contains only zero PCM samples, independent of mute and volume support',()=>{
+  const source=fs.readFileSync('lib/prepare-stage-audio.ts','utf8').match(/data:audio\/wav;base64,([^']+)/)[1];
+  const wav=Buffer.from(source,'base64');assert.equal(wav.toString('ascii',0,4),'RIFF');
+  assert.equal(wav.toString('ascii',36,40),'data');assert.equal(wav.readUInt32LE(40),wav.length-44);
+  assert.ok(wav.subarray(44).every(sample=>sample===0));
 });
